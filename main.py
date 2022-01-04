@@ -3,10 +3,15 @@ Contains code to read from file, call algorithm, and save to file.
 """
 
 import os
+import time
 import argparse
 import numpy as np
 from glob import glob
 join = os.path.join
+
+from src.compute_inputs import *
+from src.genetic_op import eval_fitness
+from src.genetic_alg import snrpga2
 
 
 def read_solomon(filename, data_dir='./data/instances/'):
@@ -31,9 +36,10 @@ def read_solomon(filename, data_dir='./data/instances/'):
 
                 inst = {}
                 inst['name'] = flines[0]
+
                 inst['num_vehicles'], inst['capacity'] = flines[4].split()
                 inst['num_vehicles'] = int(inst['num_vehicles'])
-                inst['capacity'] = int(inst['capacity'])
+                inst['capacity'] = float(inst['capacity'])
 
                 inst['customer_ids'] = []
                 inst['x'], inst['y'], inst['demand'] = [], [], []
@@ -42,15 +48,19 @@ def read_solomon(filename, data_dir='./data/instances/'):
 
                 for i in range(9, len(flines)):
                     customer_line = flines[i].split()
-                    customer_line = [int(x) for x in customer_line]
+                    customer_line = [float(x) for x in customer_line]
                     # note: customer ID of 0 indicates the depot
-                    inst['customer_ids'] += [customer_line[0]]
+                    inst['customer_ids'] += [int(customer_line[0])]
                     inst['x'] += [customer_line[1]]
                     inst['y'] += [customer_line[2]]
                     inst['demand'] += [customer_line[3]]
                     inst['ready_time'] += [customer_line[4]]
                     inst['due_time'] += [customer_line[5]]
                     inst['service_time'] += [customer_line[6]]
+
+                inst['demand'] = np.array(inst['demand'])
+                inst['ready_time'] = np.array(inst['ready_time'])
+                inst['due_time'] = np.array(inst['due_time'])
 
                 instances[inst['name']] = inst
             except:
@@ -66,18 +76,19 @@ def read_ichoua(data_dir='./data/instances/'):
     Parameters:
     - data_dir: str
     Returns:
-    - speed_mat: dict (containing speed matrices)
+    - speed_mats: np.ndarray (concatenation of speed matrices)
     - cat_mat: np.ndarray (category matrix)
     """
 
     # Load speed matrices
-    speed_mat = {}
-    for i, fname in enumerate(['t_dep.dat', 't_dep_2.dat', 't_dep_3.dat']):
+    speed_mats = []
+    for fname in ['t_dep.dat', 't_dep_2.dat', 't_dep_3.dat']:
         with open(join(data_dir, fname), "r") as f:
             flines = f.read().splitlines()
             mat_lines = [flines[j].split() for j in range(3, 6)]
             mat = np.array(mat_lines, dtype=np.float32)
-            speed_mat[i + 1] = mat
+            speed_mats += [mat]
+    speed_mats = np.array(speed_mats)
     
     # Load category matrix
     with open(join(data_dir, "catheg.dat"), "r") as f:
@@ -85,7 +96,7 @@ def read_ichoua(data_dir='./data/instances/'):
         mat_lines = [flines[j].split() for j in range(1, 151)]
         cat_mat = np.array(mat_lines, dtype=np.int32)
 
-    return speed_mat, cat_mat
+    return speed_mats, cat_mat
 
 
 def read_balseiro(data_dir='./data/instances/'):
@@ -104,13 +115,108 @@ def read_balseiro(data_dir='./data/instances/'):
     return cat_mat_2
 
 
+def reformat(sol_res):
+    """
+    Reformat algorithm output into sequential, more human-readable format.
+    Parameters:
+    - sol_res: tuple (output of genetic_alg.snrpga2())
+    Returns:
+    - sol_instr: list of list of dict (sequential instructions for each truck)
+    """
+
+    sol_instr = []
+    for route_idx in range(len(sol_res[0])):
+        truck_instr = []
+
+        # To each delivery location
+        for loc_idx in range(len(sol_res[0][route_idx])):
+            loc_dict = {}
+            loc_dict['loc_idx'] = sol_res[0][route_idx][loc_idx]
+            loc_dict['deliv_amount'] = sol_res[1][route_idx][loc_idx]
+            loc_dict['arrival_t'] = sol_res[2][route_idx][loc_idx]
+            loc_dict['depart_t'] = sol_res[3][route_idx][loc_idx]
+
+            truck_instr += [loc_dict]
+
+        # To depot
+        loc_dict = {}
+        loc_dict['loc_idx'] = 0
+        loc_dict['deliv_amount'] = 'N/A'
+        loc_dict['arrival_t'] = sol_res[4][route_idx]
+        loc_dict['depart_t'] = 'N/A'
+
+        truck_instr += [loc_dict]
+        sol_instr += [truck_instr]
+
+    return sol_instr
+
+
+def run(inst, window_size=None, speed_m=None, cat_m=None, scen=None):
+    """
+    Run data preprocessing and algorithm.
+
+    Parameters:
+    - inst: dict  (containing instance information)
+    - window_size: int (amount of unit time for each window)
+    - speed_m (optional): np.ndarray
+    - cat_m (optional): np.ndarray
+    - scen (optional): int  (scenario number)
+
+    Returns:
+    - TODO
+    """
+
+    if not window_size:
+        window_size = compute_window_size(inst['ready_time'][0],
+                                          inst['due_time'][0],
+                                          len(inst['ready_time']))
+
+    t2i = compute_t2i(inst['ready_time'][0], inst['due_time'][0], window_size)
+    i2t = compute_i2t(t2i)
+
+    # Compute distance matrices
+    D_r = compute_raw_dist_matrix(inst['x'], inst['y'])
+    D_m = compute_dist_matrix(D_r, inst['ready_time'], inst['due_time'],
+                              inst['service_time'], i2t, window_size)
+
+    # Compute time matrices
+    T_r = compute_raw_time_matrix(D_r, scen, cat_m, speed_m, i2t)
+    T_m = compute_time_matrix(T_r, inst['ready_time'], i2t)
+
+    # Call algorithm
+    begin_time = time.time()
+    res, score = snrpga2(D_m, T_m, inst['service_time'], inst['demand'],
+                         t2i, window_size, inst['ready_time'][0],
+                         inst['due_time'][0], inst['capacity'], mng=1000,
+                         init_size=100, obj_func='distance',
+                         init='random_sample')
+    end_time = time.time()
+
+    # Get raw distance w/o penalty
+    dist = eval_fitness(res[0],res[2],'distance',D_r,res[4],t2i,window_size)
+
+    sol_instr = reformat(res)
+
+    print("--- RESULTS FOR {} ---".format(inst['name']))
+    print("Distance to travel: {}".format(dist))
+    print("Score (incl. penalty): {}".format(score))
+    print("Time taken: {} seconds".format(end_time - begin_time))
+    print("Number of trucks used: {}/{}".format(len(sol_instr),
+            inst['num_vehicles']))
+    print(res[0])
+    print()
+    
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('-f', '--filename', type=str, default='*.txt')
     args = parser.parse_args()
 
     instances = read_solomon(args.filename)
-    speed_mat, cat_mat = read_ichoua()
+    speed_mats, cat_mat = read_ichoua()
     cat_mat_2 = read_balseiro()
 
-    # TODO: run algorithm
+    print("Number of instances: {}".format(len(instances)))
+    for k in instances.keys():
+        run(instances[k])
+    # TODO: for time-dependent, run one scenario or all scenarios?

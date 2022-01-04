@@ -2,16 +2,19 @@
 Contains high-level algorithm code.
 """
 
+import copy
 import math
 import numpy as np
+from random import randint
 from tqdm import tqdm
 
 from .genetic_op import *
 from .utils import round_nearest
 
 
-def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end,
-            C, mng=1000, init_size=100, obj_func='distance'):
+def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end, C,
+            mng=1000, init_size=100, obj_func='distance',
+            init='random_sample', D_r=None):
     """
     High-level code for SNRPGA2 genetic algorithm.
 
@@ -28,6 +31,9 @@ def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end,
     - mng: int (max number of generations)
     - init_size: int (size of random initial population)
     - obj_func: str ('num_vehicles' or 'distance')
+    - init: str (initialization strategy)
+        - 'random_sample', 'random_seq', 'tsp'
+    - D_r: 2D np.ndarray (raw distance matrix)
 
     Returns:
     - sol_res: tuple (detailed info of best chromosome)
@@ -50,8 +56,17 @@ def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end,
 
     # Generate random initial population
     n = D_m.shape[1] - 1  # number of customers
-    L = [np.random.choice(np.arange(1, n + 1), n, replace=False)
-            for _ in range(init_size)]
+    assert init in ['random_sample', 'random_seq', 'tsp']
+    if init == 'random_sample':
+        L = [np.random.choice(np.arange(1, n + 1), n, replace=False)
+                for _ in range(init_size)]
+    elif init == 'random_seq':
+        i = randint(1, n)
+        L = [np.hstack([np.arange(i, n + 1), np.arange(1, i)])
+                for _ in range(init_size)]
+    else:  # init == 'tsp'
+        # TODO - implement
+        pass
 
     # Evaluate fitness function of init pop
     L_res = [assign_routes(ch, C, D_t, D, T_m, t2i, window_size,
@@ -67,15 +82,15 @@ def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end,
 
         # Run tournament selection to generate pairs
         pairs = tournament_selection(S_ind,
-                    math.ceil(len(S_ind) / 2),
-                    math.ceil(len(S_ind) / 10))
+                    math.ceil(len(S_ind)), 5)
 
         # Create next generation through each candidate pair
+        L_copy = copy.deepcopy(L)
         for pair in pairs:
             i1, i2 = pair[0], pair[1]
 
             # Produce offspring through crossover and mutation
-            c1, c2 = L[i1], L[i2]
+            c1, c2 = L_copy[i1], L_copy[i2]
             d1, d2, modified_c = crossover(c1, c2)
             d1, d2, modified_m = mutation(d1, d2)
 

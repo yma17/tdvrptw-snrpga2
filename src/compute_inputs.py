@@ -2,10 +2,31 @@
 Contains helper functions for computation of values for algorithm input.
 """
 
+import math
 import numpy as np
 from scipy.spatial import distance_matrix
 
 from .utils import round_down, round_up
+
+
+def compute_window_size(b_d, e_d, num_loc, matr_size=1000000):
+    """
+    Compute a value for window_size, that allows adequate granularity
+    without necesitating too much memory for the later-to-be-computed
+    distance and time matrices.
+
+    Parameters:
+    - b_d: float (beginning depot time, >= 0)
+    - e_d: float (ending depot time, >= 0)
+    - num_loc: int (number of locations)
+    - matr_size: int
+
+    Returns:
+    - window_size: int
+    """
+    num_windows = matr_size / (num_loc ** 2)
+    window_size = math.ceil((e_d - b_d) / num_windows)
+    return window_size
 
 
 def compute_t2i(b_d, e_d, window_size):
@@ -61,7 +82,7 @@ def compute_raw_dist_matrix(x, y):
     return dist_matrix
 
 
-def compute_dist_matrix(D_r, B, E, D, i2t, window_size, mmp=2):
+def compute_dist_matrix(D_r, B, E, D, i2t, window_size, mp=100, mmp=2):
     """
     Compute time-dependent distance matrix.
     Introduce penalties based on time intervals for each location.
@@ -74,6 +95,7 @@ def compute_dist_matrix(D_r, B, E, D, i2t, window_size, mmp=2):
     - D: 1D np.ndarray (delivery times for each location)
     - i2t: list (map time window index to raw time)
     - window_size: int (amount of unit time for each window)
+    - mp: float (multiplicative penalty)
     - mmp: float (minimum multiplicative penalty)
 
     Returns:
@@ -87,8 +109,8 @@ def compute_dist_matrix(D_r, B, E, D, i2t, window_size, mmp=2):
     # For arrivals a location outside of the time interval,
     #  use this value as a penalty for the objective function.
     # This can be used to bring the arrival times within the
-    #  input time windows ("soft" TW constraint).
-    penalty_mltpr = 100 / window_size
+    #  input time windows.
+    penalty_mltpr = mp / window_size
 
     for d in range(D_r.shape[0]):
         for i, t in enumerate(i2t):
@@ -120,7 +142,6 @@ def compute_raw_time_matrix(D_r, scen=None, C=None, S=None, i2t=None):
     """
 
     if scen is None:  # non time dependent, all speeds are trivially 1
-        assert C is None and S is None and i2t is None
         return D_r  # 2D
     
     assert scen is not None and C is not None

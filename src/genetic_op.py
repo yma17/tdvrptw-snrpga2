@@ -4,7 +4,7 @@ Contains helper functions for SNRPGA2 genetic algorithm operations.
 
 import math
 import numpy as np
-from random import random, randint, sample
+from random import random, randint
 
 from .utils import round_nearest
 
@@ -62,19 +62,35 @@ def tournament_selection(S_ind, n, k, p=0.9):
     prob[-1] = 1.0 - sum(prob[:-1])
 
     sel_pairs = []
-    for _ in range(n):
-        # Get indices of contestants
-        x_list = sample(range(len(S_ind)), k)
-        x_list.sort()
-        C_ind = [S_ind[x] for x in x_list]
+    x_list = np.random.choice(range(len(S_ind)), len(S_ind), replace=False)
+    for i in range(0, len(x_list) - 1, 2):
+        sel_pairs += [np.array([x_list[i], x_list[i + 1]])]
 
-        # Select pair of two contestants
-        if p < 1.0:
-            pair = np.random.choice(C_ind, 2, replace=False, p=prob)
-        else:
-            pair = C_ind[:2]
-        sel_pairs += [pair]
+    # sel_pairs = []
+    # sel_set = set()
+    # for _ in range(n):
+    #     # Get indices of contestants
+    #     x_list = sample(range(len(S_ind)), k)
+    #     x_list.sort()
+    #     C_ind = [S_ind[x] for x in x_list]
+
+    #     # Select pair of two contestants
+    #     if p < 1.0:
+    #         pair = np.random.choice(C_ind, 2, replace=False, p=prob)
+    #     else:
+    #         pair = C_ind[:2]
+    #     sel_pairs += [pair]
+    #     sel_set.add(pair[0])
+    #     sel_set.add(pair[1])
     
+    # # Ensure every chromosome in subpopulation is included
+    # #   in at least one pair
+    # ind_left = list(set(S_ind) - sel_set)
+    # for i in range(0, len(ind_left) - 1, 2):
+    #     sel_pairs += [np.array([ind_left[i], ind_left[i + 1]])]
+    # if len(ind_left) % 2 == 0:
+    #     sel_pairs += [np.array([S_ind[0], ind_left[-1]])]
+
     return sel_pairs
 
 
@@ -189,13 +205,13 @@ def assign_routes(ch, C, D_t, D, T, t2i, window_size, g_start, g_end):
         next_cust = ch[cust_idx]
 
         # Retrieve travel time from current to next location
-        t_next = min(round_nearest(curr_departure[-1], window_size), g_end)
+        t_next = round_nearest(min(curr_departure[-1], g_end), window_size)
         i_next = t2i[int(t_next)]
         travel_time_next = T[i_next, curr_route[-1], next_cust]
 
         # Retrieve travel time from next location to depot
         next_departure = curr_departure[-1] + travel_time_next + D_t[next_cust]
-        t_depot = min(round_nearest(next_departure, window_size), g_end)
+        t_depot = round_nearest(min(next_departure, g_end), window_size)
         i_depot = t2i[int(t_depot)]
         travel_time_depot = T[i_depot, next_cust, 0]
 
@@ -241,7 +257,8 @@ def eval_fitness(routes, arrivals, obj_func, dist_matrix,
     - routes: list of lists
     - arrivals: list of lists (representing arrival times)
     - obj_func: str ('num_vehicles' or 'distance')
-    - dist_matrix: 3D np.ndarray (time-dependent distance matrix)
+    - dist_matrix: 2D or 3D np.ndarray (distance matrix)
+        - time dependent if 3D; 2D otherwise
     - depot_arrivals: list (representing final arrival times)
     - t2i: dict (map time to index of T on axis 0)
     - window_size: int (time window size)
@@ -254,7 +271,15 @@ def eval_fitness(routes, arrivals, obj_func, dist_matrix,
     score = 0.0
     if obj_func == 'num_vehicles':
         score += len(routes)
-    else:  # obj_func == 'distance'
+
+    elif dist_matrix.ndim == 2:  # obj_func == 'distance'
+        for x, route in enumerate(routes):
+            score += dist_matrix[0, route[0]]
+            for y in range(len(route) - 1):
+                score += dist_matrix[route[y], route[y + 1]]
+            score += dist_matrix[route[-1], 0]
+
+    else:  # obj_func == 'distance' and dist_matrix.ndim == 3
         for x, route in enumerate(routes):
             # Depot to first customer
             score += dist_matrix[0, 0, route[0]]
