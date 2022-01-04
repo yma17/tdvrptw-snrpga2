@@ -42,50 +42,16 @@ def test_compute_t2i_and_i2t_2():
 
 
 def test_compute_dist_matrix_1():
-    """No penalty in distance matrix expected"""
-    x, y, B, E, D, window_size = caseA()
-
-    i2t = compute_i2t(compute_t2i(B[0], E[0], window_size))
-    D_r = compute_raw_dist_matrix(x, y)
-
-    D_m = compute_dist_matrix(D_r, B, E, D, i2t, window_size)
+    x, y, _, _, _, _ = caseA()
+    
+    D_r = compute_dist_matrix(x, y)
     for i in range(len(x)):
-        assert D_m[0, i, i] == 0  # diagonal should be 0
+        assert D_r[i, i] == 0  # diagonal should be 0
     for p, q in [(1, 3), (2, 4)]:
-        assert D_m[0, p, q] == D_m[0, q, p]  # should be symmetrical
-        assert D_m[0, p, q] == 2 * math.sqrt(2)  # distance check
+        assert D_r[p, q] == D_r[q, p]  # should be symmetrical
+        assert D_r[p, q] == 2 * math.sqrt(2)  # distance check
     for p, q in [(1, 4), (2, 3)]:
-        assert D_m[0, p, q] == 2  # distance check
-    for j in range(1, D_m.shape[0]):
-        assert np.array_equal(D_m[j, :, :], D_m[0, :, :])  # no penalty
-
-
-def test_compute_dist_matrix_2():
-    """Penalty in distance matrix expected"""
-    x, y, B, E, D, window_size = caseB()
-
-    i2t = compute_i2t(compute_t2i(B[0], E[0], window_size))
-    D_r = compute_raw_dist_matrix(x, y) 
-
-    D_m = compute_dist_matrix(D_r, B, E, D, i2t, window_size)
-    d_01 = 5  # raw distance from 0 to 1
-    d_02 = math.sqrt(3**2 + 9**2)
-    d_03 = math.sqrt(3**2 + 1**2)
-    # check "too early" penalty instances
-    assert D_m[0, 0, 1] == d_01 * (100 / window_size) * 20
-    assert abs(D_m[0, 0, 2] - (d_02 * (100 / window_size) * 5)) < 1e-4 
-    assert abs(D_m[1, 0, 3] - (d_03 * (100 / window_size) * 10)) < 1e-4
-    # check "too late" penalty instances
-    assert D_m[3, 0, 1] == d_01 * (100 / window_size) * 10
-    assert abs(D_m[3, 0, 2] - (d_02 * (100 / window_size) * 10)) < 1e-4
-    assert D_m[4, 0, 1] == d_01 * (100 / window_size) * 20
-    assert abs(D_m[4, 0, 3] - (d_03 * (100 / window_size) * 5)) < 1e-4
-    # check "within time range" non-penalty instances
-    # this is the actual distance
-    assert D_m[2, 0, 1] == d_01
-    assert abs(D_m[1, 0, 2] - d_02) < 1e-4
-    assert D_m[2, 0, 1] == d_01
-    assert abs(D_m[3, 0, 3] - d_03) < 1e-4
+        assert D_r[p, q] == 2  # distance check
 
 
 def test_compute_raw_time_matrix_1():
@@ -93,7 +59,7 @@ def test_compute_raw_time_matrix_1():
     x, y, B, E, _, window_size, C, S = caseC()
 
     i2t = compute_i2t(compute_t2i(B[0], E[0], window_size))
-    D_r = compute_raw_dist_matrix(x, y)
+    D_r = compute_dist_matrix(x, y)
 
     T_r = compute_raw_time_matrix(D_r, scen=0, C=C, S=S, i2t=i2t)
     # Check shape
@@ -115,7 +81,7 @@ def test_compute_time_matrix_1():
     x, y, B, E, _, window_size = caseB()
 
     i2t = compute_i2t(compute_t2i(B[0], E[0], window_size))
-    D_r = compute_raw_dist_matrix(x, y)
+    D_r = compute_dist_matrix(x, y)
     T_r = compute_raw_time_matrix(D_r)
     
     T_m = compute_time_matrix(T_r, B, i2t)
@@ -140,7 +106,7 @@ def test_compute_time_matrix_2():
     x, y, B, E, _, window_size, C, S = caseC()
 
     i2t = compute_i2t(compute_t2i(B[0], E[0], window_size))
-    D_r = compute_raw_dist_matrix(x, y)
+    D_r = compute_dist_matrix(x, y)
     T_r = compute_raw_time_matrix(D_r, scen=0, C=C, S=S, i2t=i2t)
     
     T_m = compute_time_matrix(T_r, B, i2t)

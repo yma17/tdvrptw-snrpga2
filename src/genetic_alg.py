@@ -12,17 +12,17 @@ from .genetic_op import *
 from .utils import round_nearest
 
 
-def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end, C,
-            mng=1000, init_size=100, obj_func='distance',
-            init='random_sample', D_r=None):
+def snrpga2(D_m, T_m, D_t, D, E, t2i, window_size, g_start, g_end, C,
+            mng=1000, init_size=100, obj_func='dt', init='random_sample'):
     """
     High-level code for SNRPGA2 genetic algorithm.
 
     Parameters:
-    - D_m: 3D np.ndarray (time-dependent distance matrix)
+    - D_m: 2D np.ndarray (distance matrix)
     - T_m: 3D np.ndarray (time-dependent time travel matrix)
     - D_t: 1D np.ndarray (delivery times for each location)
     - D: 1D np.ndarray (demand for each location)
+    - E: 1D np.ndarray (end time for each location)
     - t2i: dict (map time to index of T on axis 0)
     - window_size: int (time window size)
     - g_start: int (global start time, aka opening of depot)
@@ -30,10 +30,9 @@ def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end, C,
     - C: float (capacity of each vehicle)
     - mng: int (max number of generations)
     - init_size: int (size of random initial population)
-    - obj_func: str ('num_vehicles' or 'distance')
+    - obj_func: str
     - init: str (initialization strategy)
         - 'random_sample', 'random_seq', 'tsp'
-    - D_r: 2D np.ndarray (raw distance matrix)
 
     Returns:
     - sol_res: tuple (detailed info of best chromosome)
@@ -41,7 +40,8 @@ def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end, C,
     """
 
     # Perform assertion checks to ensure feasibility of solution
-    assert D_m.shape[1] >= 3, "At least three customers required"
+    assert init in ['random_sample', 'random_seq', 'tsp']
+    assert D_m.shape[0] >= 3, "At least three customers required"
     assert D.max() <= C, "Largest demand must not exceed vehicle capacity"
     for k in range(1, D.shape[0]):
         time_to_k = T_m[0, 0, k]
@@ -55,8 +55,7 @@ def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end, C,
 
 
     # Generate random initial population
-    n = D_m.shape[1] - 1  # number of customers
-    assert init in ['random_sample', 'random_seq', 'tsp']
+    n = D_m.shape[0] - 1  # number of customers
     if init == 'random_sample':
         L = [np.random.choice(np.arange(1, n + 1), n, replace=False)
                 for _ in range(init_size)]
@@ -69,11 +68,11 @@ def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end, C,
         pass
 
     # Evaluate fitness function of init pop
-    L_res = [assign_routes(ch, C, D_t, D, T_m, t2i, window_size,
+    L_res = [assign_routes(ch, C, D_t, D, E, T_m, t2i, window_size,
                     g_start, g_end) for ch in L]
-    L_scores = [eval_fitness(res[0], res[2], obj_func, D_m, res[4],
-                    t2i, window_size) for res in L_res]
-
+    L_scores = [eval_fitness(obj_func, routes=res[0], dist_matrix=D_m,
+                        depot_arrivals=res[4], g_start=g_start)
+                        for res in L_res]
 
     pbar = tqdm(range(1, mng + 1), desc='Generation count')
     for _ in pbar:
@@ -97,15 +96,18 @@ def snrpga2(D_m, T_m, D_t, D, t2i, window_size, g_start, g_end, C,
             if not modified_c and not modified_m:
                 continue  # skip if offspring are identical to parents
 
+            d1_res = assign_routes(d1, C, D_t, D, E, T_m, t2i,
+                            window_size, g_start, g_end)
+            d2_res = assign_routes(d2, C, D_t, D, E, T_m, t2i,
+                            window_size, g_start, g_end)
+
             # Evaluate fitness function of offspring
-            d1_res = assign_routes(d1, C, D_t, D, T_m, t2i,
-                            window_size, g_start, g_end)
-            d1_score = eval_fitness(d1_res[0], d1_res[2], obj_func, D_m,
-                            d1_res[4], t2i, window_size)
-            d2_res = assign_routes(d2, C, D_t, D, T_m, t2i,
-                            window_size, g_start, g_end)
-            d2_score = eval_fitness(d2_res[0], d2_res[2], obj_func, D_m,
-                            d2_res[4], t2i, window_size)
+            d1_score = eval_fitness(obj_func, routes=d1_res[0],
+                                    dist_matrix=D_m, depot_arrivals=d1_res[4],
+                                    g_start=g_start)
+            d2_score = eval_fitness(obj_func, routes=d2_res[0],
+                                    dist_matrix=D_m, depot_arrivals=d2_res[4],
+                                    g_start=g_start)
 
             # Replace in population if fitness score is lower
             replace_in_pop(L, L_scores, L_res, i1, d1, d1_score, d1_res)

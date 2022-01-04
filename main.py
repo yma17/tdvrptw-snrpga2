@@ -151,7 +151,8 @@ def reformat(sol_res):
     return sol_instr
 
 
-def run(inst, window_size=None, speed_m=None, cat_m=None, scen=None):
+def run(inst, window_size=None, speed_m=None, cat_m=None, scen=None,
+        obj_func='dt'):
     """
     Run data preprocessing and algorithm.
 
@@ -161,10 +162,14 @@ def run(inst, window_size=None, speed_m=None, cat_m=None, scen=None):
     - speed_m (optional): np.ndarray
     - cat_m (optional): np.ndarray
     - scen (optional): int  (scenario number)
+    - obj_func: str  (specifying objective function)
+        -v: num vehicles. d: distance. t: time. dt: distance and time.
 
     Returns:
     - TODO
     """
+
+    assert obj_func in ['v', 't', 'd', 'dt']
 
     if not window_size:
         window_size = compute_window_size(inst['ready_time'][0],
@@ -174,33 +179,31 @@ def run(inst, window_size=None, speed_m=None, cat_m=None, scen=None):
     t2i = compute_t2i(inst['ready_time'][0], inst['due_time'][0], window_size)
     i2t = compute_i2t(t2i)
 
-    # Compute distance matrices
-    D_r = compute_raw_dist_matrix(inst['x'], inst['y'])
-    D_m = compute_dist_matrix(D_r, inst['ready_time'], inst['due_time'],
-                              inst['service_time'], i2t, window_size)
-
-    # Compute time matrices
-    T_r = compute_raw_time_matrix(D_r, scen, cat_m, speed_m, i2t)
+    D_m = compute_dist_matrix(inst['x'], inst['y'])
+    T_r = compute_raw_time_matrix(D_m, scen, cat_m, speed_m, i2t)
     T_m = compute_time_matrix(T_r, inst['ready_time'], i2t)
 
     # Call algorithm
     begin_time = time.time()
     res, score = snrpga2(D_m, T_m, inst['service_time'], inst['demand'],
-                         t2i, window_size, inst['ready_time'][0],
-                         inst['due_time'][0], inst['capacity'], mng=1000,
-                         init_size=100, obj_func='distance',
-                         init='random_sample')
+                         inst['due_time'], t2i, window_size,
+                         inst['ready_time'][0], inst['due_time'][0],
+                         inst['capacity'], mng=1000, init_size=100,
+                         obj_func=obj_func, init='random_sample')
     end_time = time.time()
 
-    # Get raw distance w/o penalty
-    dist = eval_fitness(res[0],res[2],'distance',D_r,res[4],t2i,window_size)
+    d = eval_fitness('d', routes=res[0], dist_matrix=D_m,
+                        depot_arrivals=res[4], g_start=inst['ready_time'][0])
+    t = eval_fitness('t', routes=res[0], dist_matrix=D_m,
+                        depot_arrivals=res[4], g_start=inst['ready_time'][0])
 
     sol_instr = reformat(res)
 
     print("--- RESULTS FOR {} ---".format(inst['name']))
-    print("Distance to travel: {}".format(dist))
-    print("Score (incl. penalty): {}".format(score))
-    print("Time taken: {} seconds".format(end_time - begin_time))
+    print("Score: {}".format(score))
+    print("Distance to travel: {}".format(d))
+    print("Total travel time: {}".format(t))
+    print("Runtime: {} seconds".format(end_time - begin_time))
     print("Number of trucks used: {}/{}".format(len(sol_instr),
             inst['num_vehicles']))
     print(res[0])
@@ -218,5 +221,5 @@ if __name__ == '__main__':
 
     print("Number of instances: {}".format(len(instances)))
     for k in instances.keys():
-        run(instances[k])
+        run(instances[k], obj_func='dt')
     # TODO: for time-dependent, run one scenario or all scenarios?

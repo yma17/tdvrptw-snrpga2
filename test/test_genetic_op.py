@@ -100,11 +100,11 @@ def test_assign_routes_1():
 
     t2i = compute_t2i(B[0], E[0], window_size)
 
-    D_r = compute_raw_dist_matrix(x, y)
+    D_r = compute_dist_matrix(x, y)
     T_r = compute_raw_time_matrix(D_r)
     T_m = compute_time_matrix(T_r, B, compute_i2t(t2i))
 
-    res = assign_routes(ch, C, D_t, D, T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch, C, D_t, D, E, T_m, t2i, window_size, B[0], E[0])
     # Check routes
     assert len(res[0]) == 3
     assert res[0][0][0] == 2
@@ -151,11 +151,11 @@ def test_assign_routes_2():
 
     t2i = compute_t2i(B[0], E[0], window_size)
 
-    D_r = compute_raw_dist_matrix(x, y)
+    D_r = compute_dist_matrix(x, y)
     T_r = compute_raw_time_matrix(D_r)
     T_m = compute_time_matrix(T_r, B, compute_i2t(t2i))
 
-    res = assign_routes(ch, C, D_t, D, T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch, C, D_t, D, E, T_m, t2i, window_size, B[0], E[0])
     # Check routes
     assert len(res[0]) == 2
     assert res[0][0][0] == 1
@@ -181,6 +181,7 @@ def test_assign_routes_3():
     - correct handling of speeds across times
     - correct handling of waiting time wrt time windows
     - correct handling of delivery times
+    - correct handling of end times for locations
     """
     x, y, B, E, D_t, window_size, C, S = caseC()
     ch = np.array([1, 2])
@@ -189,19 +190,21 @@ def test_assign_routes_3():
 
     t2i = compute_t2i(B[0], E[0], window_size)
     i2t = compute_i2t(t2i)
-    D_r = compute_raw_dist_matrix(x, y)
+    D_r = compute_dist_matrix(x, y)
     T_r = compute_raw_time_matrix(D_r, scen=0, C=C, S=S, i2t=i2t)
     T_m = compute_time_matrix(T_r, B, i2t)
     
-    res = assign_routes(ch,capacity, D_t, D, T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch,capacity,D_t,D,E, T_m, t2i, window_size, B[0], E[0])
     # Check routes
-    assert len(res[0]) == 1
+    assert len(res[0]) == 2
     # Check truck 1 arrival/departure times
     assert res[2][0][0] == 100
     assert res[3][0][0] == 111
-    assert res[2][0][1] == 112.8  # 111 + 2 * 0.9
-    assert res[3][0][1] == 134.8
-    assert abs(res[4][0] - 135.9) <= 1e-4
+    assert abs(res[4][0] - 112) <= 1e-4
+    # Check truck 2 arrival/departure times
+    assert abs(res[2][1][0] - 0.8) <= 1e-4
+    assert abs(res[3][1][0] - 22.8) <= 1e-4
+    assert abs(res[4][1] - 23.6) <= 1e-4
 
 
 def test_assign_routes_4():
@@ -221,14 +224,14 @@ def test_assign_routes_4():
     t2i = compute_t2i(B[0], E[0], window_size)
     i2t = compute_i2t(t2i)
 
-    D_r = compute_raw_dist_matrix(x, y)
+    D_r = compute_dist_matrix(x, y)
 
     #
     # Scenario 0 (fastest)
     #
     T_r = compute_raw_time_matrix(D_r, scen=0, C=C, S=S, i2t=i2t)
     T_m = compute_time_matrix(T_r, B, i2t)
-    res = assign_routes(ch,capacity, D_t, D, T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch,capacity,D_t,D,E,T_m, t2i, window_size, B[0], E[0])
     # Check routes
     assert len(res[0]) == 1
     # Check truck 1 arrival/departure times
@@ -243,7 +246,7 @@ def test_assign_routes_4():
     #
     T_r = compute_raw_time_matrix(D_r, scen=1, C=C, S=S, i2t=i2t)
     T_m = compute_time_matrix(T_r, B, i2t)
-    res = assign_routes(ch,capacity, D_t, D, T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch,capacity,D_t,D,E,T_m, t2i, window_size, B[0], E[0])
     # Check routes
     assert len(res[0]) == 1
     # Check truck 1 arrival/departure times
@@ -258,7 +261,7 @@ def test_assign_routes_4():
     #
     T_r = compute_raw_time_matrix(D_r, scen=2, C=C, S=S, i2t=i2t)
     T_m = compute_time_matrix(T_r, B, i2t)
-    res = assign_routes(ch,capacity, D_t, D, T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch,capacity,D_t,D,E,T_m, t2i, window_size, B[0], E[0])
     # Check routes
     assert len(res[0]) == 2
     # Check truck 1 arrival/departure times
@@ -272,26 +275,41 @@ def test_assign_routes_4():
 
 
 def test_eval_fitness_1():
-    x, y, B, E, D, window_size = caseA()
+    """Objective function: distance"""
+    x, y, _, _, _, _ = caseA()
 
-    t2i = compute_t2i(B[0], E[0], window_size)
-    i2t = compute_i2t(t2i)
-    D_r = compute_raw_dist_matrix(x, y) 
-    D_m = compute_dist_matrix(D_r, B, E, D, i2t, window_size)
+    D_r = compute_dist_matrix(x, y) 
 
     routes = [[1, 2], [3, 4]]
-    arrivals = [[1.6, 3.5], [2.2, 4.3]]
-    depot_arrivals = [4.1, 5.0]
-    score = eval_fitness(routes, arrivals, 'distance', D_m,
-                         depot_arrivals, t2i, window_size)
+    score = eval_fitness('d', routes=routes, dist_matrix=D_r)
     assert abs(score - 2 * (2 + 2 * math.sqrt(2))) <= 1e-4
 
     routes = [[1, 2], [3], [4]]
-    arrivals = [[1.6, 3.5], [2.2], [3.3]]
-    depot_arrivals = [4.1, 5.0, 4.9]
-    score = eval_fitness(routes, arrivals, 'distance', D_m,
-                         depot_arrivals, t2i, window_size)
+    score = eval_fitness('d', routes=routes, dist_matrix=D_r)
     assert abs(score - (2 + 2 * math.sqrt(2)) - 4 * math.sqrt(2)) <= 1e-4
+
+
+def test_eval_fitness_2():
+    """Objective function: time"""
+
+    g_start = 6
+    depot_arrivals = [9, 14, 15, 18, 12]
+    score = eval_fitness('t', depot_arrivals=depot_arrivals, g_start=g_start)
+    assert score == 38
+
+
+def test_eval_fitness_3():
+    """Objective function: weighted sum of distance and time"""
+    x, y, _, _, _, _ = caseA()
+
+    D_r = compute_dist_matrix(x, y) 
+
+    g_start = 6
+    depot_arrivals = [9, 14, 15, 18, 12]
+    routes = [[1, 2], [3, 4]]
+    score = eval_fitness('dt', routes=routes, dist_matrix=D_r,
+                depot_arrivals=depot_arrivals, g_start=g_start)
+    assert abs(score - 2 * (2 + 2 * math.sqrt(2)) - 38) <= 1e-4
 
 
 def test_replace_in_pop_1():

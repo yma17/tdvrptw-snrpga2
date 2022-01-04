@@ -68,9 +68,9 @@ def compute_i2t(t2i):
     return i2t
 
 
-def compute_raw_dist_matrix(x, y):
+def compute_dist_matrix(x, y):
     """
-    Compute (symmetric) raw distance matrix given x and y coords.
+    Compute distance matrix given x and y coords.
     Parameters:
     - x, y: list (representing coordinates)
     Returns:
@@ -80,46 +80,6 @@ def compute_raw_dist_matrix(x, y):
     pts = np.vstack([x, y]).T
     dist_matrix = distance_matrix(pts, pts)
     return dist_matrix
-
-
-def compute_dist_matrix(D_r, B, E, D, i2t, window_size, mp=100, mmp=2):
-    """
-    Compute time-dependent distance matrix.
-    Introduce penalties based on time intervals for each location.
-    If penalties are incurred, the matrix will be non-symmetric.
-
-    Parameters:
-    - D_r: np.ndarray  (raw distance matrix)
-    - B: 1D np.ndarray (begin times for each location)
-    - E: 1D np.ndarray (end times for each location)
-    - D: 1D np.ndarray (delivery times for each location)
-    - i2t: list (map time window index to raw time)
-    - window_size: int (amount of unit time for each window)
-    - mp: float (multiplicative penalty)
-    - mmp: float (minimum multiplicative penalty)
-
-    Returns:
-    - D_m: 3D np.ndarray
-        - D_m[i,s,d] = distance to travel from s to d
-            if arrival time is at time i2t[i]
-    """
-
-    D_m = np.repeat(D_r[np.newaxis, :, :], len(i2t), axis=0)
-
-    # For arrivals a location outside of the time interval,
-    #  use this value as a penalty for the objective function.
-    # This can be used to bring the arrival times within the
-    #  input time windows.
-    penalty_mltpr = mp / window_size
-
-    for d in range(D_r.shape[0]):
-        for i, t in enumerate(i2t):
-            if t < B[d]:  # too early
-                D_m[i, :, d] *= max(penalty_mltpr * (B[d] - t), mmp)
-            elif t + D[d] > E[d]:  # too late
-                D_m[i, :, d] *= max(penalty_mltpr * (t + D[d] - E[d]), mmp)
-
-    return D_m
 
 
 def compute_raw_time_matrix(D_r, scen=None, C=None, S=None, i2t=None):
