@@ -2,4 +2,3 @@
 build/*
 dist/*
 tdvrptw_snrpga2.egg-info/*
-MANIFEST.in
