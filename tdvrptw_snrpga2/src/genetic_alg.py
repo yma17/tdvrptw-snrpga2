@@ -8,8 +8,8 @@ import numpy as np
 from random import randint
 from tqdm import tqdm
 
-from .genetic_op import *
-from .utils import round_nearest
+from tdvrptw_snrpga2.src.genetic_op import *
+from tdvrptw_snrpga2.src.utils import round_nearest
 
 
 def snrpga2(D_m, T_m, D_t, D, E, t2i, window_size, g_start, g_end, C,

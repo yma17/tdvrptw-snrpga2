@@ -6,7 +6,7 @@ import math
 import numpy as np
 from scipy.spatial import distance_matrix
 
-from .utils import round_down, round_up
+from tdvrptw_snrpga2.src.utils import round_down, round_up
 
 
 def compute_window_size(b_d, e_d, num_loc, matr_size=1000000):

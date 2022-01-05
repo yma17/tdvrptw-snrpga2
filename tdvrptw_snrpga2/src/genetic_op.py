@@ -6,7 +6,7 @@ import math
 import numpy as np
 from random import random, randint, sample
 
-from .utils import round_nearest
+from tdvrptw_snrpga2.src.utils import round_nearest
 
 
 def subpop_selection(scores, n=0.3, mode='prop'):

@@ -1,9 +1,25 @@
 # tdvrptw-snrpga2
 Python implementation of the genetic algorithm SNRPGA2 for the Time-Dependent Vehicle Routing Problem with Time Windows (TDVRPTW).
 
-## Usage
+## Usage (package - recommended)
 
-Run the command `python main.py` under the root directory to run the algorithm for all Solomon files under `data/instances/`, or `python main.py -f <wildcard>` to run all Solomon files that obey `<wildcard>` (e.g. `C101.txt`, `C*.txt`, etc).
+The contents of this repository can be accessed using the Python package `tdvrptw-snrpga2` ([PyPi link](https://pypi.org/project/tdvrptw-snrpga2/)). Run `pip install tdvrptw-snrpga2` in order to use it in your code.
+
+This following code example demonstrates how to use the package within your Python program:
+
+```
+import tdvrptw_snrpga2 as ts
+
+ts.main()  # run all test cases
+ts.main('C*.txt')  # run all cases that fit this wildcard
+ts.main('C101.txt')  # run one specific test case
+```
+
+## Usage (source)
+
+If you wish, you may also run the code from source.
+
+Run the command `python main.py` under the directory `tdvrptw_snrpga2` to run the algorithm for all Solomon files under `tdvrptw_snrpga2/data/instances/`, or `python main.py -f <wildcard>` to run all Solomon files that obey `<wildcard>` (e.g. `C101.txt`, `C*.txt`, etc).
 
 `pip install -r requirements.txt` will install all libraries necessary to run the code, specifically the versions that were used to run and test it. It is recommended to install them and run the code from a virtual environment.
 

@@ -3,13 +3,10 @@ Contains unit tests for functions in src/compute_inputs.py.
 Use pytest to run tests.
 """
 
-import numpy as np
 import math
-import sys
-sys.path.insert(0, '..')
 
-from cases import *
-from src.compute_inputs import *
+from tdvrptw_snrpga2.test.cases import *
+from tdvrptw_snrpga2.src.compute_inputs import *
 
 
 def test_compute_t2i_and_i2t_1():

@@ -5,12 +5,10 @@ Use pytest to run tests.
 
 import math
 import numpy as np
-import sys
-sys.path.insert(0, '..')
 
-from cases import *
-from src.compute_inputs import *
-from src.genetic_op import *
+from tdvrptw_snrpga2.test.cases import *
+from tdvrptw_snrpga2.src.compute_inputs import *
+from tdvrptw_snrpga2.src.genetic_op import *
 
 np.random.seed(0)
 

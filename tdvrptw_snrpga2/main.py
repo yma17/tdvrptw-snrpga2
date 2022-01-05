@@ -9,9 +9,11 @@ import numpy as np
 from glob import glob
 join = os.path.join
 
-from src.compute_inputs import *
-from src.genetic_op import eval_fitness
-from src.genetic_alg import snrpga2
+from tdvrptw_snrpga2.src.compute_inputs import *
+from tdvrptw_snrpga2.src.genetic_op import eval_fitness
+from tdvrptw_snrpga2.src.genetic_alg import snrpga2
+
+CURR_PATH = os.path.dirname(__file__)
 
 
 def read_solomon(filename, data_dir='./data/instances/'):
@@ -28,7 +30,7 @@ def read_solomon(filename, data_dir='./data/instances/'):
     """
     instances = {}
 
-    file_list = glob(join(data_dir, filename))
+    file_list = glob(join(CURR_PATH, data_dir, filename))
     for file in file_list:
         with open(file, 'r') as f:
             try:
@@ -83,7 +85,7 @@ def read_ichoua(data_dir='./data/instances/'):
     # Load speed matrices
     speed_mats = []
     for fname in ['t_dep.dat', 't_dep_2.dat', 't_dep_3.dat']:
-        with open(join(data_dir, fname), "r") as f:
+        with open(join(CURR_PATH, data_dir, fname), "r") as f:
             flines = f.read().splitlines()
             mat_lines = [flines[j].split() for j in range(3, 6)]
             mat = np.array(mat_lines, dtype=np.float32)
@@ -91,7 +93,7 @@ def read_ichoua(data_dir='./data/instances/'):
     speed_mats = np.array(speed_mats)
     
     # Load category matrix
-    with open(join(data_dir, "catheg.dat"), "r") as f:
+    with open(join(CURR_PATH, data_dir, "catheg.dat"), "r") as f:
         flines = f.read().splitlines()
         mat_lines = [flines[j].split() for j in range(1, 151)]
         cat_mat = np.array(mat_lines, dtype=np.int32)
@@ -108,7 +110,7 @@ def read_balseiro(data_dir='./data/instances/'):
     Returns:
     - cat_mat_2: np.ndarray (category matrix)
     """
-    with open(join(data_dir, "catheg_2.dat"), "r") as f:
+    with open(join(CURR_PATH, data_dir, "catheg_2.dat"), "r") as f:
         flines = f.read().splitlines()
         mat_lines = [flines[j].split('\t') for j in range(1, 151)]
         cat_mat_2 = np.array(mat_lines, dtype=np.int32)
@@ -210,12 +212,8 @@ def run(inst, window_size=None, speed_m=None, cat_m=None, scen=None,
     print()
     
 
-if __name__ == '__main__':
-    parser = argparse.ArgumentParser()
-    parser.add_argument('-f', '--filename', type=str, default='*.txt')
-    args = parser.parse_args()
-
-    instances = read_solomon(args.filename)
+def main(filename='*.txt'):
+    instances = read_solomon(filename)
     speed_mats, cat_mat = read_ichoua()
     cat_mat_2 = read_balseiro()
 
@@ -223,3 +221,11 @@ if __name__ == '__main__':
     for k in instances.keys():
         run(instances[k], obj_func='dt')
     # TODO: for time-dependent, run one scenario or all scenarios?
+
+
+if __name__ == '__main__':
+    parser = argparse.ArgumentParser()
+    parser.add_argument('-f', '--filename', type=str, default='*.txt')
+    args = parser.parse_args()
+
+    main(args.filename)
