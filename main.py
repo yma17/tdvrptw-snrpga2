@@ -189,7 +189,7 @@ def run(inst, window_size=None, speed_m=None, cat_m=None, scen=None,
                          inst['due_time'], t2i, window_size,
                          inst['ready_time'][0], inst['due_time'][0],
                          inst['capacity'], mng=1000, init_size=100,
-                         obj_func=obj_func, init='random_sample')
+                         obj_func=obj_func, init='random_sample', w_t=0.1)
     end_time = time.time()
 
     d = eval_fitness('d', routes=res[0], dist_matrix=D_m,

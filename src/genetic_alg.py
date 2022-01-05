@@ -13,7 +13,8 @@ from .utils import round_nearest
 
 
 def snrpga2(D_m, T_m, D_t, D, E, t2i, window_size, g_start, g_end, C,
-            mng=1000, init_size=100, obj_func='dt', init='random_sample'):
+            mng=1000, init_size=100, obj_func='dt',
+            init='random_sample', w_t=1.0):
     """
     High-level code for SNRPGA2 genetic algorithm.
 
@@ -33,6 +34,7 @@ def snrpga2(D_m, T_m, D_t, D, E, t2i, window_size, g_start, g_end, C,
     - obj_func: str
     - init: str (initialization strategy)
         - 'random_sample', 'random_seq', 'tsp'
+    - w_t: float
 
     Returns:
     - sol_res: tuple (detailed info of best chromosome)
@@ -71,7 +73,7 @@ def snrpga2(D_m, T_m, D_t, D, E, t2i, window_size, g_start, g_end, C,
     L_res = [assign_routes(ch, C, D_t, D, E, T_m, t2i, window_size,
                     g_start, g_end) for ch in L]
     L_scores = [eval_fitness(obj_func, routes=res[0], dist_matrix=D_m,
-                        depot_arrivals=res[4], g_start=g_start)
+                        depot_arrivals=res[4], g_start=g_start, w_t=w_t)
                         for res in L_res]
 
     pbar = tqdm(range(1, mng + 1), desc='Generation count')
@@ -104,10 +106,10 @@ def snrpga2(D_m, T_m, D_t, D, E, t2i, window_size, g_start, g_end, C,
             # Evaluate fitness function of offspring
             d1_score = eval_fitness(obj_func, routes=d1_res[0],
                                     dist_matrix=D_m, depot_arrivals=d1_res[4],
-                                    g_start=g_start)
+                                    g_start=g_start, w_t=w_t)
             d2_score = eval_fitness(obj_func, routes=d2_res[0],
                                     dist_matrix=D_m, depot_arrivals=d2_res[4],
-                                    g_start=g_start)
+                                    g_start=g_start, w_t=w_t)
 
             # Replace in population if fitness score is lower
             replace_in_pop(L, L_scores, L_res, i1, d1, d1_score, d1_res)
