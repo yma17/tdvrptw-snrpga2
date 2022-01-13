@@ -6,7 +6,7 @@ import math
 import numpy as np
 from random import random, randint, sample
 
-from tdvrptw_snrpga2.src.utils import round_nearest
+from .utils import take_closest
 
 
 def subpop_selection(scores, n=0.3, mode='prop'):
@@ -164,7 +164,8 @@ def mutation(d1, d2, m_prob=0.3):
     return d1, d2, True
 
 
-def assign_routes(ch, C, D_t, D, E, T, t2i, window_size, g_start, g_end):
+def assign_routes(ch, C, D_t, D, E, T, g_start,
+                    times, t2i, cache={}, granularity=1.0):
     """
     Assign a single-route chromosome into multiple sub-chromosomes
         of smaller routes consisting of a set of customers.
@@ -180,10 +181,11 @@ def assign_routes(ch, C, D_t, D, E, T, t2i, window_size, g_start, g_end):
     - E: 1D np.ndarray (end time for each location)
     - T: 3D np.ndarray (time-dependent travel time matrix)
         - axes: time, source, destination (respectively)
+    - g_start: float (global start time, aka departure from depot)
+    - times: list (times of indices of axis 0 of T)
     - t2i: dict (map time to index of T on axis 0)
-    - window_size: int (time window size)
-    - g_start: int (global start time, aka opening of depot)
-    - g_end: int (global end time, aka closing of depot)
+    - cache: dict
+    - granularity: float
 
     Returns:
     - a tuple containing:
@@ -214,21 +216,27 @@ def assign_routes(ch, C, D_t, D, E, T, t2i, window_size, g_start, g_end):
         next_cust = ch[cust_idx]
 
         # Retrieve travel time from current to next location
-        t_next = round_nearest(min(curr_departure[-1], g_end), window_size)
-        i_next = t2i[int(t_next)]
+        t_next = take_closest(times,
+                              curr_departure[-1],
+                              cache=cache,
+                              granularity=granularity)
+        i_next = t2i[t_next]
         travel_time_next = T[i_next, curr_route[-1], next_cust]
 
         next_arrival = curr_departure[-1] + travel_time_next
 
         # Retrieve travel time from next location to depot
         next_departure = next_arrival + D_t[next_cust]
-        t_depot = round_nearest(min(next_departure, g_end), window_size)
-        i_depot = t2i[int(t_depot)]
+        t_depot = take_closest(times,
+                               next_departure,
+                               cache=cache,
+                               granularity=granularity)
+        i_depot = t2i[t_depot]
         travel_time_depot = T[i_depot, next_cust, 0]
 
         # Check customer end time, depot end time, and capacity constraints
         over_time_cust = (next_arrival > E[next_cust])
-        over_time_depot = (next_departure + travel_time_depot > g_end)
+        over_time_depot = (next_departure + travel_time_depot > E[0])
         over_capacity = (curr_deliv + D[next_cust] > C)
 
         if not over_time_cust and not over_time_depot and not over_capacity:
@@ -258,20 +266,25 @@ def assign_routes(ch, C, D_t, D, E, T, t2i, window_size, g_start, g_end):
     return (routes, amounts, arrival_times, departure_times, depot_arrivals)
 
 
-def eval_fitness(obj_func, routes=None, dist_matrix=None,
-                    depot_arrivals=None, g_start=None, w_t=1):
+def eval_fitness(obj_func, g_start, routes=None, departure_times=None,
+                    dist_matrix=None, times=None, t2i=None, cache=None,
+                    granularity=None, depot_arrivals=None, w_t=1):
     """
     "FITNESS EVALUATION" MODULE OF GENETIC ALGORITHM.
-    Evaluates fitness function with respect to the total number of
-        distance traveled and/or number of vehicles utilized.
+    Evaluates fitness function with respect to distance/time/vehicles.
 
     Parameters:
     - obj_func: str
     - routes: list of lists
-    - dist_matrix: 2D np.ndarray
+    - departure_times: list of lists
+    - dist_matrix: 3D np.ndarray
+    - times: list
+    - t2i: dict
+    - cache: dict
+    - granularity: float
     - depot_arrivals: list
     - g_start: int
-    - w_t: float (weight of time component)
+    - w_t: float
 
     Returns:
     - score: float (representing fitness score)
@@ -281,19 +294,41 @@ def eval_fitness(obj_func, routes=None, dist_matrix=None,
     if obj_func == 'v':  # number of vehicles
         return len(routes)
 
+    assert g_start is not None
+
     score = 0.0
 
     if 'd' in obj_func:  # distance
         assert routes is not None and dist_matrix is not None
+        assert departure_times is not None
+        assert times is not None and t2i is not None
+        assert cache is not None and granularity is not None
 
-        for route in routes:
-            score += dist_matrix[0, route[0]]
+        for x, route in enumerate(routes):
+            # Depot to first customer
+            t = take_closest(times,
+                             g_start,
+                             cache=cache,
+                             granularity=granularity)
+            score += dist_matrix[t2i[t], 0, route[0]]
+
+            # Customer to customer
             for y in range(len(route) - 1):
-                score += dist_matrix[route[y], route[y + 1]]
-            score += dist_matrix[route[-1], 0]
+                t = take_closest(times,
+                                 departure_times[x][y],
+                                 cache=cache,
+                                 granularity=granularity)
+                score += dist_matrix[t2i[t], route[y], route[y + 1]]
+            
+            # Last customer (back) to depot
+            t = take_closest(times,
+                             departure_times[x][-1],
+                             cache=cache,
+                             granularity=granularity)
+            score += dist_matrix[t2i[t], route[-1], 0]
 
     if 't' in obj_func:  # time
-        assert depot_arrivals is not None and g_start is not None
+        assert depot_arrivals is not None
 
         time_score = sum(depot_arrivals) - g_start * len(depot_arrivals)
         

@@ -6,9 +6,9 @@ Use pytest to run tests.
 import math
 import numpy as np
 
-from tdvrptw_snrpga2.test.cases import *
-from tdvrptw_snrpga2.src.compute_inputs import *
-from tdvrptw_snrpga2.src.genetic_op import *
+from cases import *
+from tdvrptw_snrpga2.compute_inputs import *
+from tdvrptw_snrpga2.genetic_op import *
 
 np.random.seed(0)
 
@@ -96,13 +96,15 @@ def test_assign_routes_1():
     C = 20
     D = np.array([0,15,10,10,10])
 
+    times = np.arange(B[0], E[0] + 0.01, window_size).tolist()
     t2i = compute_t2i(B[0], E[0], window_size)
 
     D_r = compute_dist_matrix(x, y)
     T_r = compute_raw_time_matrix(D_r)
     T_m = compute_time_matrix(T_r, B, compute_i2t(t2i))
 
-    res = assign_routes(ch, C, D_t, D, E, T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch, C, D_t, D, E, T_m, B[0],
+                        times, t2i, granularity=0.01)
     # Check routes
     assert len(res[0]) == 3
     assert res[0][0][0] == 2
@@ -147,13 +149,14 @@ def test_assign_routes_2():
     C = 10
     D = np.array([0,5,4,6])
 
+    times = np.arange(B[0], E[0] + 0.01, window_size).tolist()
     t2i = compute_t2i(B[0], E[0], window_size)
 
     D_r = compute_dist_matrix(x, y)
     T_r = compute_raw_time_matrix(D_r)
     T_m = compute_time_matrix(T_r, B, compute_i2t(t2i))
 
-    res = assign_routes(ch, C, D_t, D, E, T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch, C, D_t, D, E, T_m, B[0], times, t2i)
     # Check routes
     assert len(res[0]) == 2
     assert res[0][0][0] == 1
@@ -186,13 +189,14 @@ def test_assign_routes_3():
     capacity = 50
     D = np.array([0, 25, 25])
 
+    times = np.arange(B[0], E[0] + 0.01, window_size).tolist()
     t2i = compute_t2i(B[0], E[0], window_size)
     i2t = compute_i2t(t2i)
     D_r = compute_dist_matrix(x, y)
     T_r = compute_raw_time_matrix(D_r, scen=0, C=C, S=S, i2t=i2t)
     T_m = compute_time_matrix(T_r, B, i2t)
     
-    res = assign_routes(ch,capacity,D_t,D,E, T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch, capacity, D_t, D, E, T_m, B[0], times, t2i)
     # Check routes
     assert len(res[0]) == 2
     # Check truck 1 arrival/departure times
@@ -219,6 +223,7 @@ def test_assign_routes_4():
     capacity = 50
     D = np.array([0, 25, 25])
 
+    times = np.arange(B[0], E[0] + 0.01, window_size).tolist()
     t2i = compute_t2i(B[0], E[0], window_size)
     i2t = compute_i2t(t2i)
 
@@ -229,7 +234,7 @@ def test_assign_routes_4():
     #
     T_r = compute_raw_time_matrix(D_r, scen=0, C=C, S=S, i2t=i2t)
     T_m = compute_time_matrix(T_r, B, i2t)
-    res = assign_routes(ch,capacity,D_t,D,E,T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch, capacity, D_t, D, E, T_m, B[0], times, t2i)
     # Check routes
     assert len(res[0]) == 1
     # Check truck 1 arrival/departure times
@@ -244,7 +249,7 @@ def test_assign_routes_4():
     #
     T_r = compute_raw_time_matrix(D_r, scen=1, C=C, S=S, i2t=i2t)
     T_m = compute_time_matrix(T_r, B, i2t)
-    res = assign_routes(ch,capacity,D_t,D,E,T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch, capacity, D_t, D, E, T_m, B[0], times, t2i)
     # Check routes
     assert len(res[0]) == 1
     # Check truck 1 arrival/departure times
@@ -259,7 +264,7 @@ def test_assign_routes_4():
     #
     T_r = compute_raw_time_matrix(D_r, scen=2, C=C, S=S, i2t=i2t)
     T_m = compute_time_matrix(T_r, B, i2t)
-    res = assign_routes(ch,capacity,D_t,D,E,T_m, t2i, window_size, B[0], E[0])
+    res = assign_routes(ch, capacity, D_t, D, E, T_m, B[0], times, t2i)
     # Check routes
     assert len(res[0]) == 2
     # Check truck 1 arrival/departure times
@@ -274,16 +279,37 @@ def test_assign_routes_4():
 
 def test_eval_fitness_1():
     """Objective function: distance"""
-    x, y, _, _, _, _ = caseA()
+    x, y, B, E, _, window_size = caseA()
 
-    D_r = compute_dist_matrix(x, y) 
+    D_r = compute_dist_matrix(x, y)
+    times = np.arange(B[0], E[0] + 0.01, window_size).tolist()
+    t2i = compute_t2i(B[0], E[0], window_size)
+    D_m = np.repeat(D_r[np.newaxis, :, :], len(t2i), axis=0)
 
     routes = [[1, 2], [3, 4]]
-    score = eval_fitness('d', routes=routes, dist_matrix=D_r)
+    departure_times = [[1.1, 2.9], [1.5, 4.3]]
+    score = eval_fitness('d',
+                         g_start=B[0],
+                         routes=routes,
+                         departure_times=departure_times,
+                         dist_matrix=D_m,
+                         times=times,
+                         t2i=t2i,
+                         cache={},
+                         granularity=0.01)
     assert abs(score - 2 * (2 + 2 * math.sqrt(2))) <= 1e-4
 
     routes = [[1, 2], [3], [4]]
-    score = eval_fitness('d', routes=routes, dist_matrix=D_r)
+    departure_times = [[1.1, 2.9], [1.4], [3.2]]
+    score = eval_fitness('d',
+                         g_start=B[0],
+                         routes=routes,
+                         departure_times=departure_times,
+                         dist_matrix=D_m,
+                         times=times,
+                         t2i=t2i,
+                         cache={},
+                         granularity=0.01)
     assert abs(score - (2 + 2 * math.sqrt(2)) - 4 * math.sqrt(2)) <= 1e-4
 
 
@@ -298,15 +324,27 @@ def test_eval_fitness_2():
 
 def test_eval_fitness_3():
     """Objective function: weighted sum of distance and time"""
-    x, y, _, _, _, _ = caseA()
+    x, y, B, E, _, window_size = caseA()
 
-    D_r = compute_dist_matrix(x, y) 
+    D_r = compute_dist_matrix(x, y)
+    times = np.arange(B[0], E[0] + 0.01, window_size).tolist()
+    t2i = compute_t2i(B[0], E[0], window_size)
+    D_m = np.repeat(D_r[np.newaxis, :, :], len(t2i), axis=0)
 
     g_start = 6
     depot_arrivals = [9, 14, 15, 18, 12]
     routes = [[1, 2], [3, 4]]
-    score = eval_fitness('dt', routes=routes, dist_matrix=D_r,
-                depot_arrivals=depot_arrivals, g_start=g_start)
+    departure_times = [[1.1, 2.9], [1.5, 4.3]]
+    score = eval_fitness('dt',
+                         routes=routes,
+                         departure_times=departure_times,
+                         dist_matrix=D_m,
+                         times=times,
+                         t2i=t2i,
+                         cache={},
+                         granularity=0.01,
+                         depot_arrivals=depot_arrivals,
+                         g_start=g_start)
     assert abs(score - 2 * (2 + 2 * math.sqrt(2)) - 38) <= 1e-4
 
 

@@ -5,8 +5,8 @@ Use pytest to run tests.
 
 import math
 
-from tdvrptw_snrpga2.test.cases import *
-from tdvrptw_snrpga2.src.compute_inputs import *
+from cases import *
+from tdvrptw_snrpga2.compute_inputs import *
 
 
 def test_compute_t2i_and_i2t_1():
