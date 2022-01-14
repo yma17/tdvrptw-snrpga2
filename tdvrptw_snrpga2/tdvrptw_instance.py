@@ -12,42 +12,6 @@ from .genetic_op import eval_fitness
 from .genetic_alg import snrpga2
 
 
-def reformat(sol_res):
-    """
-    Reformat algorithm output into sequential, more human-readable format.
-    Parameters:
-    - sol_res: tuple (output of tdvrptw_snrpga2.genetic_alg.snrpga2())
-    Returns:
-    - sol_instr: list of list of dict (sequential instructions for each truck)
-    """
-
-    sol_instr = []
-    for route_idx in range(len(sol_res[0])):
-        truck_instr = []
-
-        # To each delivery location
-        for loc_idx in range(len(sol_res[0][route_idx])):
-            loc_dict = {}
-            loc_dict['loc_idx'] = sol_res[0][route_idx][loc_idx]
-            loc_dict['deliv_amount'] = sol_res[1][route_idx][loc_idx]
-            loc_dict['arrival_t'] = sol_res[2][route_idx][loc_idx]
-            loc_dict['depart_t'] = sol_res[3][route_idx][loc_idx]
-
-            truck_instr += [loc_dict]
-
-        # To depot
-        loc_dict = {}
-        loc_dict['loc_idx'] = 0
-        loc_dict['deliv_amount'] = 'N/A'
-        loc_dict['arrival_t'] = sol_res[4][route_idx]
-        loc_dict['depart_t'] = 'N/A'
-
-        truck_instr += [loc_dict]
-        sol_instr += [truck_instr]
-
-    return sol_instr
-
-
 class TDVRPTWInstance(object):
     """Instance of a TDVRPTW problem."""
 
@@ -91,7 +55,7 @@ class TDVRPTWInstance(object):
         self.num_vehicles = 0  # (maximum) number of vehicles (optional)
         self.C = None  # maximum truck capacity
 
-        self.customer_ids = []  # list of customer id names
+        self.location_ids = []  # list of location id names
         self.x, self.y = [], []  # coordinates for each location
         self.demand = []  # demand for each location
         self.ready_time = []  # start time for each location's time window
@@ -126,7 +90,7 @@ class TDVRPTWInstance(object):
         self.name = inst_s["name"]
         self.num_vehicles = inst_s["num_vehicles"]
         self.C = inst_s["capacity"]
-        self.customer_ids = inst_s["customer_ids"]
+        self.location_ids = inst_s["customer_ids"]
         self.x, self.y = inst_s["x"], inst_s["y"]
         self.demand = inst_s["demand"]
         self.ready_time = inst_s["ready_time"]
@@ -169,7 +133,7 @@ class TDVRPTWInstance(object):
         assert D_m.ndim == 3 and T_m.ndim == 3
         assert D_m.shape == T_m.shape
         assert D_m.shape[0] == len(time_list)
-        assert D_m.shape[0] == len(self.x)
+        assert D_m.shape[1] == len(self.x)
 
         self.D_m = D_m
         self.T_m = T_m
@@ -197,7 +161,7 @@ class TDVRPTWInstance(object):
         assert len(due_time) == len(service_time)
 
         self.x, self.y = x, y
-        self.customer_ids = customer_ids
+        self.location_ids = customer_ids
         self.demand = np.array(demand)
         self.ready_time = np.array(ready_time)
         self.due_time = np.array(due_time)
@@ -210,6 +174,8 @@ class TDVRPTWInstance(object):
         Parameter: scen: int (scenario number; required if speed matr used)
         Returns: sol_instr (output of reformat())
         """
+
+        print(self.get_params())
 
         # Compute matrices, time indices if not explicitly specified
         if self.t2i is None:
@@ -247,7 +213,7 @@ class TDVRPTWInstance(object):
                              w_t=self.params["w_t"])
                              for f in ('d', 't')]
 
-        sol_instr = reformat(res)
+        sol_instr = self.reformat(res)
 
         print("--- RESULTS FOR {} ---".format(self.name))
         print("Score: {}".format(score))
@@ -256,7 +222,49 @@ class TDVRPTWInstance(object):
         print("Runtime: {} seconds".format(end_time - begin_time))
         print("Number of trucks used: {}/{}".format(len(sol_instr),
                 self.num_vehicles))
-        print(res[0])
+        print("Routes:", res[0])
         print()
+
+        return sol_instr
+
+
+    def reformat(self, sol_res):
+        """
+        Reformat algorithm output into sequential, more human-readable format.
+        Parameters:
+        - sol_res: tuple (output of tdvrptw_snrpga2.genetic_alg.snrpga2())
+        Returns:
+        - sol_instr: list of list of dict (sequential instructions for each truck)
+        """
+
+        sol_instr = []
+        for route_idx in range(len(sol_res[0])):
+            truck_instr = []
+
+            # Specify statistics for truck across all locations
+            info_dict = {}
+            info_dict["total_customers"] = len(sol_res[0][route_idx])
+            info_dict["total_deliv_amount"] = sum(sol_res[1][route_idx])
+            truck_instr += [info_dict]
+
+            # To each delivery location
+            for loc_idx in range(len(sol_res[0][route_idx])):
+                loc_dict = {}
+                loc_dict['loc_id'] = self.location_ids[sol_res[0][route_idx][loc_idx]]
+                loc_dict['deliv_amount'] = sol_res[1][route_idx][loc_idx]
+                loc_dict['arrival_t'] = sol_res[2][route_idx][loc_idx]
+                loc_dict['depart_t'] = sol_res[3][route_idx][loc_idx]
+
+                truck_instr += [loc_dict]
+
+            # To depot
+            loc_dict = {}
+            loc_dict['loc_id'] = self.location_ids[0]
+            loc_dict['deliv_amount'] = 'N/A'
+            loc_dict['arrival_t'] = sol_res[4][route_idx]
+            loc_dict['depart_t'] = 'N/A'
+
+            truck_instr += [loc_dict]
+            sol_instr += [truck_instr]
 
         return sol_instr

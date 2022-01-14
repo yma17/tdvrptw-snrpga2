@@ -2,6 +2,13 @@
 Changelog
 =========
 
+Version 0.2.1
+=============
+
+- Moved reformat() function into TDVRPTWInstance class
+- Fix bug with assertion check in set_matrices() function
+- Print hyperparameters at beginning of run() function
+
 Version 0.2.0
 =============
 

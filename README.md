@@ -87,7 +87,7 @@ A full list of hyperparameters, including name, explanation, default value, and 
 
 Additionally, current values of hyperparameters can be retrieved through calling `inst.get_params()` or `inst.get_param(param_name)`.
 
-### 6. Running the algorithm, retrieving the results
+### 6. Running the algorithm
 
 Once all previous required steps have been run, the following line of code will run the algorithm:
 
@@ -95,15 +95,52 @@ Once all previous required steps have been run, the following line of code will 
 sol_instr = inst.run()
 ```
 
-Using default hyperparameters, expected runtime should be 90-100 seconds.
+Upon completion, result statistics will be printed to console, and a data structure containing the results in the format of instructions for each vehicle (`sol_instr`) will be returned. See next section for the type/format of this data structure
 
-Upon completion, result statistics will be printed to console, and a data structure containing the results in the format of instructions for each vehicle (`sol_instr`) will be returned.
+### 7. Interpreting the results
+
+`sol_instr` is a Python list, consisting of `T` sub-lists, where `T` is the number of vehicles used in the result, and each sub-list containing instructions on how to follow the algorithm's routing solution for a single vehicle. Specifically, each of these sub-lists consist of `U(T) + 2` dictionary structures that contain demand, arrival, departure, and other information, where `U(T)` is the number of customers that truck `T` delivers to.
+
+Here is an outline of the structure, as well as datatypes of variables within it:
+
+```
+[
+    [
+        {
+            "total_customers": int,
+            "total_deliv_amount": float
+        },  # Overall truck statistics
+
+        {
+            "loc_id": str,
+            "deliv_amount": float,
+            "arrival_t": float,
+            "depart_t": float
+        },  # Instructions for delivery to first customer
+
+        {...}, ..., {...},  # Instructions for delivery to each subsequent customer
+        
+        {
+            "loc_id": str,
+            "arrival_t": float
+        }  # Instructions for travel back to depot
+    ],  # Data for first vehicle used
+
+    [
+        ...  # Data for each subsequent vehicle used
+    ],
+
+    ...
+]
+```
 
 ## Usage (for benchmark data)
 
 This repository contains data for various benchmarks of the TDVRPTW problem, namely Solomon (1987), Ichoua et al. (2003), and Balseiro et al. (2010). By running a Python script with command line arguments, specified instance(s) may be run.
 
 Under the `test` directory, run the command `python run_benchmarks.py -f <wildcard>` to run the algorithm all Solomon files/instances that obey `<wildcard>` (e.g. `C101.txt`, `C*.txt`, etc). The results will be printed to console.
+
+Using default hyperparameters, expected runtime should be around 90-120 seconds with the Solomon instances, which have 100 customers each.
 
 ## Citations
 

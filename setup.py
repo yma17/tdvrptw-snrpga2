@@ -1,6 +1,6 @@
 from setuptools import setup, find_packages
 
-VERSION = '0.2.0' 
+VERSION = '0.2.1' 
 DESCRIPTION = 'SNRPGA2 algorithm to solve TDVRPTW'
 LONG_DESCRIPTION = 'Implementation of the genetic algorithm SNRPGA2 for ' + \
      'the Time-Dependent Vehicle Routing Problem with Time Windows ' + \
