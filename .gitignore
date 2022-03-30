@@ -1,4 +1,5 @@
 .vscode/*
 build/*
 dist/*
+*/__pycache__/*
 tdvrptw_snrpga2.egg-info/*

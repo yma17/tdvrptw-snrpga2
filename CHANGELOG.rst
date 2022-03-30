@@ -2,6 +2,12 @@
 Changelog
 =========
 
+Version 0.3.0
+=============
+
+- Changed format of data structure outputted by reformat()
+- Updated README.md to reflect this change
+
 Version 0.2.1
 =============
 

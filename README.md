@@ -104,34 +104,45 @@ Upon completion, result statistics will be printed to console, and a data struct
 Here is an outline of the structure, as well as datatypes of variables within it:
 
 ```
-[
-    [
+{
+    "overall": {
+        "num_trucks": int,
+        "num_customers": int,
+        "total_deliv_amount": float,
+        "earliest_time": float,
+        "latest_time": float
+    },  # Statistics across all trucks
+
+    "per_truck": [
         {
-            "total_customers": int,
-            "total_deliv_amount": float
-        },  # Overall truck statistics
+            "overall": {
+                "num_customers": int,
+                "total_deliv_amount": float,
+                "earliest_time": float,
+                "latest_time": float
+            },  # Statistics across all customers
 
-        {
-            "loc_id": str,
-            "deliv_amount": float,
-            "arrival_t": float,
-            "depart_t": float
-        },  # Instructions for delivery to first customer
+            "per_customer": [
+                {
+                    "loc_id": str,
+                    "deliv_amount": float,
+                    "arrival_t": float,
+                    "depart_t": float
+                },  # Instructions for delivery to first customer
 
-        {...}, ..., {...},  # Instructions for delivery to each subsequent customer
-        
-        {
-            "loc_id": str,
-            "arrival_t": float
-        }  # Instructions for travel back to depot
-    ],  # Data for first vehicle used
+                {...}, ..., {...},  # Instructions for each subsequent customer
+            ],  # Instructions for delivery for each customer
 
-    [
-        ...  # Data for each subsequent vehicle used
-    ],
+            "back_to_depot": {
+                "loc_id": str,
+                "arrival_t": float
+            }  # Instructions for travel back to depot
 
-    ...
-]
+        },  # Information for one truck
+
+        {...}, ..., {...}  # Information for the other trucks
+    ]  # Statistics for each truck
+}
 ```
 
 ## Usage (for benchmark data)

@@ -220,7 +220,7 @@ class TDVRPTWInstance(object):
         print("Distance to travel: {}".format(d))
         print("Total travel time: {}".format(t))
         print("Runtime: {} seconds".format(end_time - begin_time))
-        print("Number of trucks used: {}/{}".format(len(sol_instr),
+        print("Number of trucks used: {}/{}".format(len(sol_instr["per_truck"]),
                 self.num_vehicles))
         print("Routes:", res[0])
         print()
@@ -234,20 +234,18 @@ class TDVRPTWInstance(object):
         Parameters:
         - sol_res: tuple (output of tdvrptw_snrpga2.genetic_alg.snrpga2())
         Returns:
-        - sol_instr: list of list of dict (sequential instructions for each truck)
+        - sol_instr: dict (instructions)
         """
 
-        sol_instr = []
+        sol_instr = {}
+
+        # Information for each truck
+        per_truck = []
         for route_idx in range(len(sol_res[0])):
-            truck_instr = []
+            truck_info = {}
 
-            # Specify statistics for truck across all locations
-            info_dict = {}
-            info_dict["total_customers"] = len(sol_res[0][route_idx])
-            info_dict["total_deliv_amount"] = sum(sol_res[1][route_idx])
-            truck_instr += [info_dict]
-
-            # To each delivery location
+            # Instructions for delivery to each customer
+            truck_per_customer = []
             for loc_idx in range(len(sol_res[0][route_idx])):
                 loc_dict = {}
                 loc_dict['loc_id'] = self.location_ids[sol_res[0][route_idx][loc_idx]]
@@ -255,16 +253,35 @@ class TDVRPTWInstance(object):
                 loc_dict['arrival_t'] = sol_res[2][route_idx][loc_idx]
                 loc_dict['depart_t'] = sol_res[3][route_idx][loc_idx]
 
-                truck_instr += [loc_dict]
+                truck_per_customer += [loc_dict]
+            truck_info["per_customer"] = truck_per_customer
 
-            # To depot
+            # Instructions for travel back to depot
             loc_dict = {}
             loc_dict['loc_id'] = self.location_ids[0]
-            loc_dict['deliv_amount'] = 'N/A'
             loc_dict['arrival_t'] = sol_res[4][route_idx]
-            loc_dict['depart_t'] = 'N/A'
+            truck_info["back_to_depot"] = loc_dict
 
-            truck_instr += [loc_dict]
-            sol_instr += [truck_instr]
+            # Specify statistics for truck across all locations
+            truck_overall = {}
+            truck_overall["num_customers"] = len(sol_res[0][route_idx])
+            truck_overall["total_deliv_amount"] = sum(sol_res[1][route_idx])
+            all_truck_times = [truck_info["back_to_depot"]["arrival_t"]] + \
+                [x["arrival_t"] for x in truck_info["per_customer"]] + \
+                [x["depart_t"] for x in truck_info["per_customer"]]
+            truck_overall["earliest_time"] = min(all_truck_times)
+            truck_overall["latest_time"] = max(all_truck_times)
+            truck_info["overall"] = truck_overall
+
+            per_truck += [truck_info]
+        sol_instr["per_truck"] = per_truck
+
+        # Statistics across all trucks
+        sol_instr["overall"] = {}
+        sol_instr["overall"]["num_trucks"] = len(sol_res[0])
+        sol_instr["overall"]["num_customers"] = sum([x["overall"]["num_customers"] for x in per_truck])
+        sol_instr["overall"]["total_deliv_amount"] = sum([x["overall"]["total_deliv_amount"] for x in per_truck])
+        sol_instr["overall"]["earliest_time"] = min([x["overall"]["earliest_time"] for x in per_truck])
+        sol_instr["overall"]["latest_time"] = max([x["overall"]["latest_time"] for x in per_truck])
 
         return sol_instr
